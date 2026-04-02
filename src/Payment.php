@@ -1,6 +1,6 @@
 <?php
 
-namespace Laravel\Paddle;
+namespace HandycatsDev\CashierPayFast;
 
 use Carbon\Carbon;
 use Illuminate\Contracts\Support\Arrayable;
@@ -10,88 +10,34 @@ use Money\Currency;
 
 class Payment implements Arrayable, Jsonable, JsonSerializable
 {
-    /**
-     * The amount of the payment.
-     *
-     * @var string
-     */
-    public $amount;
-
-    /**
-     * The currency of the payment.
-     *
-     * @var string
-     */
-    public $currency;
-
-    /**
-     * The payment date.
-     *
-     * @var \Carbon\Carbon
-     */
-    public $date;
-
-    /**
-     * Create a new Payment instance.
-     *
-     * @param  string  $amount
-     * @param  string  $currency
-     * @param  \Carbon\Carbon  $date
-     * @return void
-     */
-    public function __construct($amount, $currency, $date)
-    {
-        $this->amount = $amount;
-        $this->currency = $currency;
-        $this->date = $date;
+    public function __construct(
+        public $amount,
+        public $currency,
+        public $date
+    ) {
     }
 
-    /**
-     * Get the total amount of the payment.
-     *
-     * @return string
-     */
-    public function amount()
+    public function amount(): string
     {
-        return Cashier::formatAmount($this->amount, $this->currency);
+        return Cashier::formatAmount((int) ($this->amount * 100), $this->currency);
     }
 
-    /**
-     * Get the raw total of the payment.
-     *
-     * @return string
-     */
     public function rawAmount()
     {
         return $this->amount;
     }
 
-    /**
-     * Get the currency used for the payment.
-     *
-     * @return \Money\Currency
-     */
     public function currency(): Currency
     {
         return new Currency($this->currency);
     }
 
-    /**
-     * Get the date of the payment as a Carbon instance.
-     *
-     * @return \Carbon\Carbon
-     */
-    public function date()
+    public function date(): Carbon
     {
         return $this->date;
     }
 
-    /**
-     * Get the instance as an array.
-     *
-     * @return array
-     */
-    public function toArray()
+    public function toArray(): array
     {
         return [
             'amount' => $this->amount(),
@@ -100,24 +46,13 @@ class Payment implements Arrayable, Jsonable, JsonSerializable
         ];
     }
 
-    /**
-     * Convert the object to its JSON representation.
-     *
-     * @param  int  $options
-     * @return string
-     */
-    public function toJson($options = 0)
+    public function toJson($options = 0): string
     {
         return json_encode($this->jsonSerialize(), $options);
     }
 
-    /**
-     * Convert the object into something JSON serializable.
-     *
-     * @return array
-     */
     #[\ReturnTypeWillChange]
-    public function jsonSerialize()
+    public function jsonSerialize(): array
     {
         return $this->toArray();
     }
