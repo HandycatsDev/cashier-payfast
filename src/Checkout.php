@@ -1,164 +1,105 @@
 <?php
 
-namespace Laravel\Paddle;
+namespace HandycatsDev\CashierPayFast;
 
 use Illuminate\Contracts\Support\Arrayable;
+use Illuminate\Http\RedirectResponse;
 use JsonSerializable;
-use LogicException;
 
 class Checkout implements Arrayable, JsonSerializable
 {
-    /**
-     * The custom data for the checkout.
-     */
     protected array $custom = [];
 
-    /**
-     * The URL which the customer will be returned to after starting the subscription.
-     */
-    protected ?string $returnTo = null;
+    protected ?string $returnUrl = null;
 
-    /**
-     * Create a new checkout instance.
-     */
+    protected ?string $cancelUrl = null;
+
+    protected ?string $notifyUrl = null;
+
     public function __construct(
-        protected ?Customer $customer,
-        protected array $items = [],
-        protected array $transaction = []
+        protected PayFastClient $client,
+        protected array $params = []
     ) {
-        $this->items = Cashier::normalizeItems($items, 'priceId');
+        $this->returnUrl = config('cashier.return_url');
+        $this->cancelUrl = config('cashier.cancel_url');
+        $this->notifyUrl = config('cashier.notify_url');
     }
 
-    /**
-     * Create a new checkout instance for a guest.
-     */
-    public static function guest(array $items = []): self
+    public static function make(array $params = []): static
     {
-        return new static(null, $items);
+        return new static(app(PayFastClient::class), $params);
     }
 
-    /**
-     * Create a new checkout instance for an existing customer.
-     */
-    public static function customer(Customer $customer, array $items = []): self
+    public function returnTo(string $url): static
     {
-        return new static($customer, $items);
-    }
-
-    /**
-     * Create a new transaction on Paddle and return a new checkout instance.
-     */
-    public static function transaction(array $transaction, ?Customer $customer = null): self
-    {
-        return new static($customer, [], $transaction);
-    }
-
-    /**
-     * Add custom data to the checkout.
-     */
-    public function customData(array $custom): self
-    {
-        // Make sure subscription_type doesn't gets unset.
-        if (isset($this->custom['subscription_type']) && isset($custom['subscription_type'])) {
-            throw new LogicException('The subscription_type can not be overwritten.');
-        }
-
-        $this->custom = $custom;
+        $this->returnUrl = $url;
 
         return $this;
     }
 
-    /**
-     * Convert the checkout to an array compatible with `Paddle.Checkout.open`.
-     */
-    public function options(): array
+    public function cancelTo(string $url): static
     {
-        $options = [
-            'settings' => array_filter([
-                'displayMode' => 'inline',
-                'frameStyle' => 'width: 100%; background-color: transparent; border: none;',
-                'successUrl' => $this->returnTo,
-                'allowLogout' => false,
-            ]),
-            'items' => $this->items,
-        ];
-
-        if ($customer = $this->customer) {
-            $options['customer'] = ['id' => $customer->paddle_id];
-        }
-
-        if ($custom = $this->custom) {
-            $options['customData'] = $custom;
-        }
-
-        return $options;
-    }
-
-    /**
-     * The URL the customer should be returned to after a successful checkout.
-     */
-    public function returnTo(string $returnTo): self
-    {
-        $this->returnTo = $returnTo;
+        $this->cancelUrl = $url;
 
         return $this;
     }
 
-    /**
-     * Get the customer for the checkout.
-     */
-    public function getCustomer(): ?Customer
+    public function notifyTo(string $url): static
     {
-        return $this->customer;
+        $this->notifyUrl = $url;
+
+        return $this;
     }
 
-    /**
-     * Get the items for the checkout.
-     */
-    public function getItems(): array
+    public function customData(array $custom): static
     {
-        return $this->items;
+        $this->custom = array_merge($this->custom, $custom);
+
+        return $this;
     }
 
-    /**
-     * Get the Paddle transaction data.
-     */
-    public function getTransaction(): array
+    public function fields(): array
     {
-        return $this->transaction;
+        $data = array_merge($this->params, array_filter([
+            'return_url' => $this->returnUrl,
+            'cancel_url' => $this->cancelUrl,
+            'notify_url' => $this->notifyUrl,
+        ]));
+
+        if (! empty($this->custom)) {
+            $data['custom_str1'] = json_encode($this->custom);
+        }
+
+        return $this->client->buildPaymentData($data);
     }
 
-    /**
-     * Get the custom data for the checkout.
-     */
+    public function url(): string
+    {
+        return $this->client->processUrl();
+    }
+
+    public function redirect(): RedirectResponse
+    {
+        return new RedirectResponse($this->url().'?'.http_build_query($this->fields()));
+    }
+
     public function getCustomData(): array
     {
         return $this->custom;
     }
 
-    /**
-     * Get the URL the customer should be returned to after a successful checkout.
-     */
     public function getReturnUrl(): ?string
     {
-        return $this->returnTo;
+        return $this->returnUrl;
     }
 
-    /**
-     * Get the checkout's JSON serializable attributes.
-     */
     public function jsonSerialize(): mixed
     {
-        return $this->options();
+        return $this->fields();
     }
 
-    /**
-     * Convert the checkout to its array representation.
-     *
-     * @return array
-     */
-    public function toArray()
+    public function toArray(): array
     {
-        return $this->options();
+        return $this->fields();
     }
 }

@@ -1,32 +1,15 @@
 <?php
 
-namespace Laravel\Paddle;
+namespace HandycatsDev\CashierPayFast;
 
 class SubscriptionBuilder
 {
-    /**
-     * The quantity of the subscription.
-     *
-     * @var int
-     */
-    protected $quantity = 1;
+    protected int $quantity = 1;
 
-    /**
-     * The interval of the subscription.
-     *
-     * @var string
-     */
-    protected $interval = Subscription::INTERVAL_MONTH;
+    protected int $frequency = Subscription::FREQUENCY_MONTHLY;
 
-    /**
-     * Create a new subscription builder instance.
-     *
-     * @param  \Laravel\Paddle\Billable  $billable
-     * @param  int  $amount
-     * @param  string  $name
-     * @param  string  $type
-     * @return void
-     */
+    protected int $cycles = 0;
+
     public function __construct(
         protected $billable,
         protected int $amount,
@@ -35,88 +18,60 @@ class SubscriptionBuilder
     ) {
     }
 
-    /**
-     * Specify the quantity of the subscription.
-     *
-     * @param  int  $quantity
-     * @return $this
-     */
-    public function quantity($quantity)
+    public function quantity(int $quantity): static
     {
         $this->quantity = $quantity;
 
         return $this;
     }
 
-    /**
-     * Use a daily interval for the subscription.
-     */
-    public function daily()
+    public function monthly(): static
     {
-        $this->interval = Subscription::INTERVAL_DAY;
+        $this->frequency = Subscription::FREQUENCY_MONTHLY;
 
         return $this;
     }
 
-    /**
-     * Use a weekly interval for the subscription.
-     *
-     * @return $this
-     */
-    public function weekly()
+    public function quarterly(): static
     {
-        $this->interval = Subscription::INTERVAL_WEEK;
+        $this->frequency = Subscription::FREQUENCY_QUARTERLY;
 
         return $this;
     }
 
-    /**
-     * Use a monthly interval for the subscription.
-     *
-     * @return $this
-     */
-    public function monthly()
+    public function biannually(): static
     {
-        $this->interval = Subscription::INTERVAL_MONTH;
+        $this->frequency = Subscription::FREQUENCY_BIANNUALLY;
 
         return $this;
     }
 
-    /**
-     * Use a yearly interval for the subscription.
-     *
-     * @return $this
-     */
-    public function yearly()
+    public function yearly(): static
     {
-        $this->interval = Subscription::INTERVAL_YEAR;
+        $this->frequency = Subscription::FREQUENCY_ANNUALLY;
 
         return $this;
     }
 
-    /**
-     * Get a new checkout instance for the subscription.
-     *
-     * @param  array  $options
-     * @return \Laravel\Paddle\Checkout
-     */
-    public function checkout(array $options = [])
+    public function cycles(int $cycles): static
     {
-        return $this->billable->charge(
-            $this->amount,
-            $this->name,
-            array_replace_recursive([
-                'price' => [
-                    'description' => $this->interval === Subscription::INTERVAL_DAY
-                        ? "{$this->name} Daily"
-                        : $this->name.' '.ucfirst($this->interval).'ly',
-                    'billing_cycle' => [
-                        'interval' => $this->interval,
-                        'frequency' => $options['frequency'] ?? 1,
-                    ],
-                ],
-                'quantity' => $this->quantity,
-            ], $options)
-        )->customData(['subscription_type' => $this->type]);
+        $this->cycles = $cycles;
+
+        return $this;
+    }
+
+    public function checkout(array $options = []): Checkout
+    {
+        $params = array_merge([
+            'amount' => number_format($this->amount / 100, 2, '.', ''),
+            'item_name' => $this->name,
+            'subscription_type' => 1,
+            'frequency' => $this->frequency,
+            'cycles' => $this->cycles,
+        ], $options);
+
+        return Checkout::make($params)->customData([
+            'subscription_type' => $this->type,
+        ]);
     }
 }
