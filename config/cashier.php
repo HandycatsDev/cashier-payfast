@@ -4,24 +4,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Paddle Keys
+    | PayFast Credentials
     |--------------------------------------------------------------------------
     |
-    | The Paddle seller ID and API key will allow your application to call
-    | the Paddle API. The seller key is typically used when interacting
-    | with Paddle.js, while the "API" key accesses private endpoints.
+    | Your PayFast merchant credentials. The merchant ID and key are used
+    | to authenticate with PayFast. The passphrase is used for signature
+    | generation and ITN validation.
     |
     */
 
-    'seller_id' => env('PADDLE_SELLER_ID'),
+    'merchant_id' => env('CASHIER_MERCHANT_ID'),
 
-    'client_side_token' => env('PADDLE_CLIENT_SIDE_TOKEN'),
+    'merchant_key' => env('CASHIER_MERCHANT_KEY'),
 
-    'api_key' => env('PADDLE_AUTH_CODE') ?? env('PADDLE_API_KEY'),
-
-    'retain_key' => env('PADDLE_RETAIN_KEY'),
-
-    'webhook_secret' => env('PADDLE_WEBHOOK_SECRET'),
+    'passphrase' => env('CASHIER_PASSPHRASE'),
 
     /*
     |--------------------------------------------------------------------------
@@ -34,20 +30,23 @@ return [
     |
     */
 
-    'path' => env('CASHIER_PATH', 'paddle'),
+    'path' => env('CASHIER_PATH', 'cashier'),
 
     /*
     |--------------------------------------------------------------------------
-    | Cashier Webhook
+    | Cashier URLs
     |--------------------------------------------------------------------------
     |
-    | This is the base URI where webhooks from Paddle will be sent. The URL
-    | built into Cashier Paddle is used by default; however, you can add
-    | a custom URL when required for any application testing purposes.
+    | These URLs control where users are redirected after payment and where
+    | PayFast sends ITN (Instant Transaction Notification) callbacks.
     |
     */
 
-    'webhook' => env('CASHIER_WEBHOOK'),
+    'return_url' => env('CASHIER_RETURN_URL', '/cashier/return'),
+
+    'cancel_url' => env('CASHIER_CANCEL_URL', '/cashier/cancel'),
+
+    'notify_url' => env('CASHIER_NOTIFY_URL', '/cashier/webhook'),
 
     /*
     |--------------------------------------------------------------------------
@@ -55,12 +54,11 @@ return [
     |--------------------------------------------------------------------------
     |
     | This is the default currency that will be used when generating charges
-    | from your application. Of course, you are welcome to use any of the
-    | various world currencies that are currently supported via Paddle.
+    | from your application. PayFast primarily supports ZAR.
     |
     */
 
-    'currency' => env('CASHIER_CURRENCY', 'USD'),
+    'currency' => env('CASHIER_CURRENCY', 'ZAR'),
 
     /*
     |--------------------------------------------------------------------------
@@ -73,18 +71,18 @@ return [
     |
     */
 
-    'currency_locale' => env('CASHIER_CURRENCY_LOCALE', 'en'),
+    'currency_locale' => env('CASHIER_CURRENCY_LOCALE', 'en_ZA'),
 
     /*
     |--------------------------------------------------------------------------
-    | Paddle Sandbox
+    | PayFast Sandbox
     |--------------------------------------------------------------------------
     |
-    | This option allows you to toggle between the Paddle live environment
-    | and its sandboxed environment.
+    | This option allows you to toggle between the PayFast live environment
+    | and its sandbox environment for testing.
     |
     */
 
-    'sandbox' => env('PADDLE_SANDBOX', false),
+    'sandbox' => env('CASHIER_SANDBOX', false),
 
 ];
