@@ -20,9 +20,13 @@ class Checkout implements Arrayable, JsonSerializable
         protected PayFastClient $client,
         protected array $params = []
     ) {
-        $this->returnUrl = config('cashier.return_url');
-        $this->cancelUrl = config('cashier.cancel_url');
-        $this->notifyUrl = config('cashier.notify_url');
+        try {
+            $this->returnUrl = config('cashier.return_url');
+            $this->cancelUrl = config('cashier.cancel_url');
+            $this->notifyUrl = config('cashier.notify_url');
+        } catch (\Exception) {
+            // No Laravel application container available (e.g. unit tests)
+        }
     }
 
     public static function make(array $params = []): static
