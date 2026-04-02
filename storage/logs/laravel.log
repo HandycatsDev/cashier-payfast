@@ -1,0 +1,30 @@
+[2026-04-02 15:24:25] production.ERROR: Uncaught Exception: The /home/nick/Projects/cashier-payfast/bootstrap/cache directory must be present and writable. in /home/nick/Projects/cashier-payfast/vendor/laravel/framework/src/Illuminate/Foundation/PackageManifest.php:179
+Stack trace:
+#0 /home/nick/Projects/cashier-payfast/vendor/orchestra/testbench-core/src/Foundation/PackageManifest.php(158): Illuminate\Foundation\PackageManifest->write()
+#1 /home/nick/Projects/cashier-payfast/vendor/laravel/framework/src/Illuminate/Foundation/PackageManifest.php(132): Orchestra\Testbench\Foundation\PackageManifest->write()
+#2 /home/nick/Projects/cashier-payfast/vendor/laravel/framework/src/Illuminate/Foundation/PackageManifest.php(108): Illuminate\Foundation\PackageManifest->build()
+#3 /home/nick/Projects/cashier-payfast/vendor/orchestra/testbench-core/src/Foundation/PackageManifest.php(103): Illuminate\Foundation\PackageManifest->getManifest()
+#4 /home/nick/Projects/cashier-payfast/vendor/laravel/framework/src/Illuminate/Foundation/PackageManifest.php(90): Orchestra\Testbench\Foundation\PackageManifest->getManifest()
+#5 /home/nick/Projects/cashier-payfast/vendor/laravel/framework/src/Illuminate/Foundation/PackageManifest.php(79): Illuminate\Foundation\PackageManifest->config()
+#6 /home/nick/Projects/cashier-payfast/vendor/laravel/framework/src/Illuminate/Foundation/Bootstrap/RegisterFacades.php(26): Illuminate\Foundation\PackageManifest->aliases()
+#7 /home/nick/Projects/cashier-payfast/vendor/orchestra/testbench-core/src/Concerns/CreatesApplication.php(533): Illuminate\Foundation\Bootstrap\RegisterFacades->bootstrap()
+#8 /home/nick/Projects/cashier-payfast/vendor/orchestra/testbench-core/src/Concerns/CreatesApplication.php(288): Orchestra\Testbench\Foundation\Application->resolveApplicationBootstrappers()
+#9 Command line code(6): Orchestra\Testbench\Foundation\Application->createApplication()
+#10 {main}
+  thrown {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Uncaught Exception: The /home/nick/Projects/cashier-payfast/bootstrap/cache directory must be present and writable. in /home/nick/Projects/cashier-payfast/vendor/laravel/framework/src/Illuminate/Foundation/PackageManifest.php:179
+Stack trace:
+#0 /home/nick/Projects/cashier-payfast/vendor/orchestra/testbench-core/src/Foundation/PackageManifest.php(158): Illuminate\\Foundation\\PackageManifest->write()
+#1 /home/nick/Projects/cashier-payfast/vendor/laravel/framework/src/Illuminate/Foundation/PackageManifest.php(132): Orchestra\\Testbench\\Foundation\\PackageManifest->write()
+#2 /home/nick/Projects/cashier-payfast/vendor/laravel/framework/src/Illuminate/Foundation/PackageManifest.php(108): Illuminate\\Foundation\\PackageManifest->build()
+#3 /home/nick/Projects/cashier-payfast/vendor/orchestra/testbench-core/src/Foundation/PackageManifest.php(103): Illuminate\\Foundation\\PackageManifest->getManifest()
+#4 /home/nick/Projects/cashier-payfast/vendor/laravel/framework/src/Illuminate/Foundation/PackageManifest.php(90): Orchestra\\Testbench\\Foundation\\PackageManifest->getManifest()
+#5 /home/nick/Projects/cashier-payfast/vendor/laravel/framework/src/Illuminate/Foundation/PackageManifest.php(79): Illuminate\\Foundation\\PackageManifest->config()
+#6 /home/nick/Projects/cashier-payfast/vendor/laravel/framework/src/Illuminate/Foundation/Bootstrap/RegisterFacades.php(26): Illuminate\\Foundation\\PackageManifest->aliases()
+#7 /home/nick/Projects/cashier-payfast/vendor/orchestra/testbench-core/src/Concerns/CreatesApplication.php(533): Illuminate\\Foundation\\Bootstrap\\RegisterFacades->bootstrap()
+#8 /home/nick/Projects/cashier-payfast/vendor/orchestra/testbench-core/src/Concerns/CreatesApplication.php(288): Orchestra\\Testbench\\Foundation\\Application->resolveApplicationBootstrappers()
+#9 Command line code(6): Orchestra\\Testbench\\Foundation\\Application->createApplication()
+#10 {main}
+  thrown at /home/nick/Projects/cashier-payfast/vendor/laravel/framework/src/Illuminate/Foundation/PackageManifest.php:179)
+[stacktrace]
+#0 {main}
+"} 

@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php -r 'require '\\\\''vendor/autoload.php'\\\\''; $c = new \\\\HandycatsDev\\\\CashierPayFast\\\\PayFastClient\\('\\\\''10000100'\\\\'', '\\\\''46f0cd694581a'\\\\'', '\\\\''jt7NOE43FZPn'\\\\'', true\\); $ch = new \\\\HandycatsDev\\\\CashierPayFast\\\\Checkout\\($c, ['\\\\''amount'\\\\'' => '\\\\''100.00'\\\\'', '\\\\''item_name'\\\\'' => '\\\\''Test'\\\\'']\\); $f = $ch->fields\\(\\); echo $f['\\\\''merchant_id'\\\\''].PHP_EOL; echo $f['\\\\''amount'\\\\''].PHP_EOL; echo isset\\($f['\\\\''signature'\\\\'']\\) ? '\\\\''has signature'\\\\'' : '\\\\''no sig'\\\\''; echo PHP_EOL;')"
+    ]
+  }
+}
