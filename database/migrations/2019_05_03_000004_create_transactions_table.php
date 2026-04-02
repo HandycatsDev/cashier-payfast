@@ -6,29 +6,23 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('transactions', function (Blueprint $table) {
             $table->id();
             $table->morphs('billable');
-            $table->string('paddle_id')->unique();
-            $table->string('paddle_subscription_id')->nullable()->index();
-            $table->string('invoice_number')->nullable();
-            $table->string('status');
-            $table->string('total');
-            $table->string('tax');
-            $table->string('currency', 3);
+            $table->string('provider_id')->unique();
+            $table->string('provider_subscription_id')->nullable()->index();
+            $table->string('payment_status');
+            $table->decimal('amount_gross', 10, 2);
+            $table->decimal('amount_fee', 10, 2)->default(0);
+            $table->decimal('amount_net', 10, 2);
+            $table->string('currency', 3)->default('ZAR');
             $table->timestamp('billed_at');
             $table->timestamps();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('transactions');
