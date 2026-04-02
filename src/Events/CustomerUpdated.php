@@ -21,7 +21,7 @@ class CustomerUpdated
     /**
      * The customer instance.
      *
-     * @var \Laravel\Paddle\Customer
+     * @var \HandycatsDev\CashierPayFast\Customer
      */
     public $customer;
 
@@ -36,7 +36,7 @@ class CustomerUpdated
      * Create a new event instance.
      *
      * @param  \Illuminate\Database\Eloquent\Model  $billable
-     * @param  \Laravel\Paddle\Customer  $customer
+     * @param  \HandycatsDev\CashierPayFast\Customer  $customer
      * @param  array  $payload
      * @return void
      */

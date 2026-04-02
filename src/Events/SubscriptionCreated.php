@@ -21,7 +21,7 @@ class SubscriptionCreated
     /**
      * The subscription instance.
      *
-     * @var \Laravel\Paddle\Subscription
+     * @var \HandycatsDev\CashierPayFast\Subscription
      */
     public $subscription;
 
@@ -36,7 +36,7 @@ class SubscriptionCreated
      * Create a new event instance.
      *
      * @param  \Illuminate\Database\Eloquent\Model  $billable
-     * @param  \Laravel\Paddle\Subscription  $subscription
+     * @param  \HandycatsDev\CashierPayFast\Subscription  $subscription
      * @param  array  $payload
      * @return void
      */

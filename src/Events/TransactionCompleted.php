@@ -21,7 +21,7 @@ class TransactionCompleted
     /**
      * The transaction instance.
      *
-     * @var \Laravel\Paddle\Transaction
+     * @var \HandycatsDev\CashierPayFast\Transaction
      */
     public $transaction;
 
@@ -36,7 +36,7 @@ class TransactionCompleted
      * Create a new event instance.
      *
      * @param  \Illuminate\Database\Eloquent\Model  $billable
-     * @param  \Laravel\Paddle\Transaction  $transaction
+     * @param  \HandycatsDev\CashierPayFast\Transaction  $transaction
      * @param  array  $payload
      * @return void
      */

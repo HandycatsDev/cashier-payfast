@@ -13,7 +13,7 @@ class SubscriptionPaused
     /**
      * The subscription instance.
      *
-     * @var \Laravel\Paddle\Subscription
+     * @var \HandycatsDev\CashierPayFast\Subscription
      */
     public $subscription;
 
@@ -27,7 +27,7 @@ class SubscriptionPaused
     /**
      * Create a new event instance.
      *
-     * @param  \Laravel\Paddle\Subscription  $subscription
+     * @param  \HandycatsDev\CashierPayFast\Subscription  $subscription
      * @param  array  $payload
      * @return void
      */
