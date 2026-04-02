@@ -1,33 +1,32 @@
 <?php
 
-namespace Laravel\Paddle;
+namespace HandycatsDev\CashierPayFast;
 
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
-use Laravel\Paddle\Components\Button;
-use Laravel\Paddle\Components\Checkout;
+use HandycatsDev\CashierPayFast\Components\Button;
+use HandycatsDev\CashierPayFast\Components\Checkout as CheckoutComponent;
 
 class CashierServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     *
-     * @return void
-     */
-    public function register()
+    public function register(): void
     {
         $this->mergeConfigFrom(
             __DIR__.'/../config/cashier.php', 'cashier'
         );
+
+        $this->app->singleton(PayFastClient::class, function ($app) {
+            return new PayFastClient(
+                merchantId: config('cashier.merchant_id', ''),
+                merchantKey: config('cashier.merchant_key', ''),
+                passphrase: config('cashier.passphrase', ''),
+                sandbox: config('cashier.sandbox', false),
+            );
+        });
     }
 
-    /**
-     * Bootstrap any package services.
-     *
-     * @return void
-     */
-    public function boot()
+    public function boot(): void
     {
         $this->bootRoutes();
         $this->bootResources();
@@ -36,17 +35,12 @@ class CashierServiceProvider extends ServiceProvider
         $this->bootComponents();
     }
 
-    /**
-     * Boot the package routes.
-     *
-     * @return void
-     */
-    protected function bootRoutes()
+    protected function bootRoutes(): void
     {
         if (Cashier::$registersRoutes) {
             Route::group([
                 'prefix' => config('cashier.path'),
-                'namespace' => 'Laravel\Paddle\Http\Controllers',
+                'namespace' => 'HandycatsDev\CashierPayFast\Http\Controllers',
                 'as' => 'cashier.',
             ], function () {
                 $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
@@ -54,22 +48,12 @@ class CashierServiceProvider extends ServiceProvider
         }
     }
 
-    /**
-     * Boot the package resources.
-     *
-     * @return void
-     */
-    protected function bootResources()
+    protected function bootResources(): void
     {
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'cashier');
     }
 
-    /**
-     * Boot the package's publishable resources.
-     *
-     * @return void
-     */
-    protected function bootPublishing()
+    protected function bootPublishing(): void
     {
         if ($this->app->runningInConsole()) {
             $this->publishes([
@@ -86,28 +70,18 @@ class CashierServiceProvider extends ServiceProvider
         }
     }
 
-    /**
-     * Boot the package directives.
-     *
-     * @return void
-     */
-    protected function bootDirectives()
+    protected function bootDirectives(): void
     {
-        Blade::directive('paddleJS', function ($expression) {
+        Blade::directive('cashierJS', function ($expression) {
             $expression = $expression ?: '[]';
 
             return '<?php echo view("cashier::js", ["nonce" => '.$expression.'["nonce"] ?? ""]); ?>';
         });
     }
 
-    /**
-     * Boot the package components.
-     *
-     * @return void
-     */
-    protected function bootComponents()
+    protected function bootComponents(): void
     {
-        Blade::component(Button::class, 'paddle-button');
-        Blade::component(Checkout::class, 'paddle-checkout');
+        Blade::component(Button::class, 'cashier-button');
+        Blade::component(CheckoutComponent::class, 'cashier-checkout');
     }
 }
