@@ -1,11 +1,11 @@
 <?php
 
-namespace Laravel\Paddle\Events;
+namespace HandycatsDev\CashierPayFast\Events;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
-use Laravel\Paddle\Transaction;
+use HandycatsDev\CashierPayFast\Transaction;
 
 class TransactionCompleted
 {

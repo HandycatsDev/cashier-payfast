@@ -1,6 +1,6 @@
 <?php
 
-namespace Laravel\Paddle\Events;
+namespace HandycatsDev\CashierPayFast\Events;
 
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;

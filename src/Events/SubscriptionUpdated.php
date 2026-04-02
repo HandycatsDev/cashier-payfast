@@ -1,10 +1,10 @@
 <?php
 
-namespace Laravel\Paddle\Events;
+namespace HandycatsDev\CashierPayFast\Events;
 
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
-use Laravel\Paddle\Subscription;
+use HandycatsDev\CashierPayFast\Subscription;
 
 class SubscriptionUpdated
 {
