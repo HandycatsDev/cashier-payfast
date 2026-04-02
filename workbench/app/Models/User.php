@@ -2,10 +2,10 @@
 
 namespace Workbench\App\Models;
 
-use Illuminate\Foundation\Auth\User as Authenticable;
-use Laravel\Paddle\Billable;
+use HandycatsDev\CashierPayFast\Billable;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 
-class User extends Authenticable
+class User extends Authenticatable
 {
     use Billable;
 
