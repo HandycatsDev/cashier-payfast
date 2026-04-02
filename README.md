@@ -1,4 +1,4 @@
-<p align="center"><img width="355" height="62" src="/art/logo.svg" alt="Logo Laravel Cashier Paddle"></p>
+# Cashier PayFast
 
 <p align="center">
 <a href="https://github.com/laravel/cashier-paddle/actions"><img src="https://github.com/laravel/cashier-paddle/workflows/tests/badge.svg" alt="Build Status"></a>
@@ -9,7 +9,7 @@
 
 ## Introduction
 
-Laravel Cashier Paddle provides an expressive, fluent interface to [Paddle's](https://paddle.com) subscription billing services. It handles almost all of the boilerplate subscription billing code you are dreading writing. In addition to basic subscription management, Cashier can handle swapping subscription, subscription "quantities", subscription pausing, cancellation grace periods and much more.
+Laravel Cashier integration for PayFast. Provides an expressive, fluent interface to PayFast's subscription billing services.
 
 ## Official Documentation
 
