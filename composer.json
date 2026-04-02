@@ -1,5 +1,5 @@
 {
-    "name": "HandycatsDev/cashier-payfast",
+    "name": "handycatsdev/cashier-payfast",
     "description": "Laravel Cashier integration for PayFast",
     "keywords": [
         "laravel",
