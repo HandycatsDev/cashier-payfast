@@ -31,22 +31,26 @@ class PayFastClient
         return $data;
     }
 
+    /**
+     * Generate an MD5 signature from the given data.
+     *
+     * PayFast requires parameters in their original order (NOT alphabetically sorted).
+     * Values are URL-encoded with spaces as '+'.
+     */
     public function generateSignature(array $data): string
     {
         unset($data['signature']);
 
-        ksort($data);
-
         $pfOutput = '';
         foreach ($data as $key => $val) {
             if ($val !== '') {
-                $pfOutput .= $key.'='.urlencode(trim($val)).'&';
+                $pfOutput .= $key.'='.urlencode(trim((string) $val)).'&';
             }
         }
 
-        $pfOutput = rtrim($pfOutput, '&');
+        $pfOutput = substr($pfOutput, 0, -1);
 
-        if ($this->passphrase !== '') {
+        if ($this->passphrase !== null && $this->passphrase !== '') {
             $pfOutput .= '&passphrase='.urlencode(trim($this->passphrase));
         }
 
