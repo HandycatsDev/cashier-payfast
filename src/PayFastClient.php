@@ -19,16 +19,73 @@ class PayFastClient
     ) {
     }
 
+    /**
+     * Build payment data in the exact field order PayFast requires.
+     *
+     * PayFast field order: merchant details, callback URLs, buyer details,
+     * transaction details, custom fields, subscription fields.
+     */
     public function buildPaymentData(array $params): array
     {
-        $data = array_merge([
-            'merchant_id' => $this->merchantId,
-            'merchant_key' => $this->merchantKey,
-        ], $params);
+        // Extract known fields to enforce PayFast's required order
+        $ordered = [];
 
-        $data['signature'] = $this->generateSignature($data);
+        // 1. Merchant details
+        $ordered['merchant_id'] = $this->merchantId;
+        $ordered['merchant_key'] = $this->merchantKey;
 
-        return $data;
+        // 2. Callback URLs
+        foreach (['return_url', 'cancel_url', 'notify_url'] as $key) {
+            if (isset($params[$key]) && $params[$key] !== '') {
+                $ordered[$key] = $params[$key];
+                unset($params[$key]);
+            }
+        }
+
+        // 3. Buyer details
+        foreach (['name_first', 'name_last', 'email_address', 'cell_number'] as $key) {
+            if (isset($params[$key]) && $params[$key] !== '') {
+                $ordered[$key] = $params[$key];
+                unset($params[$key]);
+            }
+        }
+
+        // 4. Transaction details
+        foreach (['m_payment_id', 'amount', 'item_name', 'item_description'] as $key) {
+            if (isset($params[$key]) && $params[$key] !== '') {
+                $ordered[$key] = $params[$key];
+                unset($params[$key]);
+            }
+        }
+
+        // 5. Custom fields
+        foreach (['custom_int1', 'custom_int2', 'custom_int3', 'custom_int4', 'custom_int5',
+                   'custom_str1', 'custom_str2', 'custom_str3', 'custom_str4', 'custom_str5'] as $key) {
+            if (isset($params[$key]) && $params[$key] !== '') {
+                $ordered[$key] = $params[$key];
+                unset($params[$key]);
+            }
+        }
+
+        // 6. Subscription fields
+        foreach (['subscription_type', 'billing_date', 'recurring_amount', 'frequency', 'cycles',
+                   'subscription_notify_email', 'subscription_notify_webhook', 'subscription_notify_buyer'] as $key) {
+            if (isset($params[$key]) && $params[$key] !== '') {
+                $ordered[$key] = $params[$key];
+                unset($params[$key]);
+            }
+        }
+
+        // 7. Any remaining params not in the known list
+        foreach ($params as $key => $val) {
+            if ($val !== '') {
+                $ordered[$key] = $val;
+            }
+        }
+
+        $ordered['signature'] = $this->generateSignature($ordered);
+
+        return $ordered;
     }
 
     /**
