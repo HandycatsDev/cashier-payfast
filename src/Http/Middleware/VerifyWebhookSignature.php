@@ -13,16 +13,22 @@ class VerifyWebhookSignature
     {
         $client = app(PayFastClient::class);
 
-        if (! $client->isValidIp($request->ip())) {
-            throw new AccessDeniedHttpException('Invalid ITN source IP.');
+        // Skip IP verification in sandbox mode (ngrok/tunnels use proxy IPs)
+        if (! config('cashier.sandbox')) {
+            if (! $client->isValidIp($request->ip())) {
+                throw new AccessDeniedHttpException('Invalid ITN source IP.');
+            }
         }
 
         if (! $client->validateSignature($request->all())) {
             throw new AccessDeniedHttpException('Invalid ITN signature.');
         }
 
-        if (! $client->confirmItn($request->except('signature'))) {
-            throw new AccessDeniedHttpException('ITN server confirmation failed.');
+        // Skip server confirmation in sandbox mode
+        if (! config('cashier.sandbox')) {
+            if (! $client->confirmItn($request->except('signature'))) {
+                throw new AccessDeniedHttpException('ITN server confirmation failed.');
+            }
         }
 
         return $next($request);
