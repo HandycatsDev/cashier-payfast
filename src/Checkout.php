@@ -65,9 +65,9 @@ class Checkout implements Arrayable, JsonSerializable
     public function fields(): array
     {
         $data = array_merge($this->params, array_filter([
-            'return_url' => $this->returnUrl,
-            'cancel_url' => $this->cancelUrl,
-            'notify_url' => $this->notifyUrl,
+            'return_url' => $this->toAbsoluteUrl($this->returnUrl),
+            'cancel_url' => $this->toAbsoluteUrl($this->cancelUrl),
+            'notify_url' => $this->toAbsoluteUrl($this->notifyUrl),
         ]));
 
         if (! empty($this->custom)) {
@@ -85,6 +85,27 @@ class Checkout implements Arrayable, JsonSerializable
     public function redirect(): RedirectResponse
     {
         return new RedirectResponse($this->url().'?'.http_build_query($this->fields()));
+    }
+
+    /**
+     * Convert a relative URL to an absolute URL.
+     */
+    protected function toAbsoluteUrl(?string $url): ?string
+    {
+        if ($url === null) {
+            return null;
+        }
+
+        // Already absolute
+        if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) {
+            return $url;
+        }
+
+        try {
+            return url($url);
+        } catch (\Exception) {
+            return $url;
+        }
     }
 
     public function getCustomData(): array
