@@ -26,9 +26,33 @@ class Cashier
 
     public static string $transactionModel = Transaction::class;
 
+    /**
+     * Custom callback for resolving a billable from the ITN payload.
+     *
+     * Receives the full ITN payload array and must return a billable model
+     * (e.g. an instance of the model using the Billable trait) or null.
+     * Used by the webhook handler as a fallback when the billable cannot be
+     * resolved via an existing subscription token, and before the email-based
+     * lookup. Useful for multi-tenant or custom flows where the billable
+     * identity is encoded in `custom_str1` (e.g. a `tenant_id`).
+     *
+     * @var (callable(array): mixed)|null
+     */
+    public static $resolveBillableUsing = null;
+
     public static function findBillable($providerId)
     {
         return (new static::$customerModel)->where('provider_id', $providerId)->first()?->billable;
+    }
+
+    /**
+     * Register a callback to resolve a billable from the ITN payload.
+     *
+     * @param  callable(array): mixed  $callback
+     */
+    public static function resolveBillableUsing(callable $callback): void
+    {
+        static::$resolveBillableUsing = $callback;
     }
 
     public static function webhookUrl(): string

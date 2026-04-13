@@ -4,6 +4,7 @@ namespace HandycatsDev\CashierPayFast\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Log;
 use HandycatsDev\CashierPayFast\Cashier;
 use HandycatsDev\CashierPayFast\Events\PaymentComplete;
 use HandycatsDev\CashierPayFast\Events\PaymentFailed;
@@ -49,6 +50,13 @@ class WebhookController extends Controller
         $billable = $this->findOrCreateBillable($payload);
 
         if (! $billable) {
+            Log::warning('[CashierPayFast] Unable to resolve billable for COMPLETE ITN — no transaction recorded', [
+                'pf_payment_id' => $payload['pf_payment_id'] ?? null,
+                'token'         => $payload['token'] ?? null,
+                'email_address' => $payload['email_address'] ?? null,
+                'custom_str1'   => $payload['custom_str1'] ?? null,
+            ]);
+
             return;
         }
 
@@ -72,7 +80,7 @@ class WebhookController extends Controller
 
     protected function handleFailed(array $payload): void
     {
-        $billable = $this->findBillableByEmail($payload['email_address'] ?? '');
+        $billable = $this->findOrCreateBillable($payload);
 
         PaymentFailed::dispatch($billable, $payload);
     }
@@ -128,8 +136,6 @@ class WebhookController extends Controller
 
     protected function findOrCreateBillable(array $payload)
     {
-        $email = $payload['email_address'] ?? '';
-
         if (! empty($payload['token'])) {
             $subscription = Cashier::$subscriptionModel::where('provider_id', $payload['token'])->first();
             if ($subscription) {
@@ -137,7 +143,15 @@ class WebhookController extends Controller
             }
         }
 
-        return $this->findBillableByEmail($email);
+        if (is_callable(Cashier::$resolveBillableUsing)) {
+            $resolved = call_user_func(Cashier::$resolveBillableUsing, $payload);
+
+            if ($resolved) {
+                return $resolved;
+            }
+        }
+
+        return $this->findBillableByEmail($payload['email_address'] ?? '');
     }
 
     protected function findBillableByEmail(string $email)
