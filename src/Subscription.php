@@ -240,16 +240,40 @@ class Subscription extends Model
      * ends — typically the end of the current billing period that the
      * customer has already paid for. When null, defaults to now() (no grace
      * period), which is the legacy behaviour.
+     *
+     * Implementation note: the local state is set BEFORE the PayFast API
+     * call. This is intentional to defeat a race where PayFast's CANCELLED
+     * ITN can arrive at our webhook *before* the cancel() HTTP call returns
+     * to PHP. If we set local state after the API call, the webhook sees
+     * `ends_at IS NULL`, sets it to now(), and triggers immediate free-plan
+     * assignment — silently throwing away the customer's grace period.
+     * By writing the future ends_at first, the webhook sees a non-null
+     * value and leaves it alone.
+     *
+     * On API failure we roll the local state back so the caller can retry.
      */
     public function cancel(?CarbonInterface $endsAt = null): static
     {
         $client = app(PayFastClient::class);
-        $client->cancelSubscription($this->provider_id);
+
+        $originalStatus = $this->status;
+        $originalEndsAt = $this->ends_at;
 
         $this->forceFill([
-            'status' => self::STATUS_CANCELED,
+            'status'  => self::STATUS_CANCELED,
             'ends_at' => $endsAt ?? now(),
         ])->save();
+
+        try {
+            $client->cancelSubscription($this->provider_id);
+        } catch (\Throwable $e) {
+            $this->forceFill([
+                'status'  => $originalStatus,
+                'ends_at' => $originalEndsAt,
+            ])->save();
+
+            throw $e;
+        }
 
         return $this;
     }

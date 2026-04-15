@@ -125,6 +125,36 @@ class PayFastClient
         return hash_equals($expectedSignature, $receivedSignature);
     }
 
+    /**
+     * Generate a signature for the PayFast subscription API, mirroring
+     * PayFast's official PHP SDK (lib/Auth.php::generateApiSignature).
+     *
+     * The canonical form for API requests differs from payment-form
+     * signing: the passphrase is added to the array BEFORE sorting and
+     * is therefore alphabetised with all other variables, not appended
+     * at the end. Mixing the two conventions produces an MD5 that
+     * PayFast rejects with HTTP 401 "Merchant authorisation failed".
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function generateApiSignature(array $data): string
+    {
+        if ($this->passphrase !== null && $this->passphrase !== '') {
+            $data['passphrase'] = $this->passphrase;
+        }
+
+        unset($data['signature']);
+
+        ksort($data);
+
+        $canonical = '';
+        foreach ($data as $key => $val) {
+            $canonical .= $key.'='.urlencode((string) $val).'&';
+        }
+
+        return md5(rtrim($canonical, '&'));
+    }
+
     public function isValidIp(string $ip): bool
     {
         $ipLong = ip2long($ip);
@@ -267,7 +297,7 @@ class PayFastClient
         if ($response->failed() || $statusIsFailed) {
             $errorCode    = isset($body['code']) && is_scalar($body['code']) ? (string) $body['code'] : null;
             $errorStatus  = $body['status'] ?? null;
-            $errorMessage = $body['data']['message'] ?? null;
+            $errorMessage = $this->extractErrorMessage($body);
 
             ApiRequestFailed::dispatch(
                 method: $method,
@@ -280,11 +310,9 @@ class PayFastClient
             );
 
             // PayFast sometimes returns a non-JSON body (e.g. on 401) or a
-            // JSON body without data.message. Fall back to a truncated raw
-            // body so the exception message is never empty.
-            $messageForException = $errorMessage !== null && $errorMessage !== ''
-                ? $errorMessage
-                : $this->summariseResponseBody($response->body());
+            // JSON body without a usable message field. Fall back to a
+            // truncated raw body so the exception message is never empty.
+            $messageForException = $errorMessage ?? $this->summariseResponseBody($response->body());
 
             $exceptionMessage = sprintf(
                 "PayFast API error '%s' occurred on %s %s (HTTP %d)",
@@ -305,6 +333,31 @@ class PayFastClient
         );
 
         return $body;
+    }
+
+    /**
+     * Extract a usable error message from PayFast's error envelope.
+     *
+     * PayFast's API is inconsistent: for most endpoints the text lives at
+     * `data.message`, but on some errors (e.g. PATCH /subscriptions/.../update
+     * returning 401) the text is actually at `data.response` and `data.message`
+     * is literally `false`. Prefer whichever field is a non-empty string.
+     *
+     * @param  array<string, mixed>  $body
+     */
+    private function extractErrorMessage(array $body): ?string
+    {
+        $message = $body['data']['message'] ?? null;
+        if (is_string($message) && $message !== '') {
+            return $message;
+        }
+
+        $response = $body['data']['response'] ?? null;
+        if (is_string($response) && $response !== '') {
+            return $response;
+        }
+
+        return null;
     }
 
     /**
@@ -342,21 +395,22 @@ class PayFastClient
     {
         $timestamp = now()->toIso8601String();
 
-        $signaturePayload = [
+        // PayFast's subscription API requires the canonical form produced
+        // by generateApiSignature() — passphrase alphabetised inside the
+        // sorted array, not appended at the end. See generateApiSignature()
+        // for the rationale.
+        $signature = $this->generateApiSignature([
             'merchant-id' => $this->merchantId,
-            'passphrase'  => $this->passphrase,
             'timestamp'   => $timestamp,
             'version'     => 'v1',
             ...$body,
-        ];
-
-        ksort($signaturePayload);
+        ]);
 
         return [
             'merchant-id' => $this->merchantId,
             'version'     => 'v1',
             'timestamp'   => $timestamp,
-            'signature'   => $this->generateSignature($signaturePayload),
+            'signature'   => $signature,
         ];
     }
 }

@@ -208,4 +208,98 @@ class PayFastClientTest extends TestCase
 
         Http::assertSent(fn ($request) => str_contains($request->url(), 'testing=true'));
     }
+
+    public function test_generate_api_signature_matches_payfasts_canonical_form(): void
+    {
+        // PayFast's subscription API canonical form (matches their official
+        // PHP SDK at lib/Auth.php::generateApiSignature):
+        //
+        //   1. Insert passphrase into the variable array
+        //   2. Alphabetically sort by key (so passphrase is sorted in line)
+        //   3. Build "key=urlencoded(value)" pairs joined by &
+        //   4. md5 the resulting string
+        //
+        // For a PATCH /update with amount=45000, the canonical string is:
+        //   amount=45000&merchant-id=10000100&passphrase=jt7NOE43FZPn&timestamp=...&version=v1
+        //
+        // Note passphrase is *between* merchant-id and timestamp alphabetically,
+        // NOT appended at the end. That distinction was the reason the API
+        // returned HTTP 401 before this test existed.
+        $client = new PayFastClient('10000100', 'test-key', 'jt7NOE43FZPn', sandbox: false);
+
+        $timestamp = '2026-04-15T12:00:00+00:00';
+
+        $sorted = [
+            'amount'      => 45000,
+            'merchant-id' => '10000100',
+            'passphrase'  => 'jt7NOE43FZPn',
+            'timestamp'   => $timestamp,
+            'version'     => 'v1',
+        ];
+
+        $canonical = '';
+        foreach ($sorted as $key => $val) {
+            $canonical .= $key.'='.urlencode((string) $val).'&';
+        }
+        $canonical = rtrim($canonical, '&');
+
+        $expected = md5($canonical);
+
+        $actual = $client->generateApiSignature([
+            'amount'      => 45000,
+            'merchant-id' => '10000100',
+            'timestamp'   => $timestamp,
+            'version'     => 'v1',
+        ]);
+
+        $this->assertSame($expected, $actual);
+    }
+
+    public function test_generate_api_signature_alphabetises_passphrase_with_other_keys(): void
+    {
+        // Defensive: assert that passphrase ends up between alphabetically-
+        // adjacent keys, NOT at the end. If a future refactor reverts to
+        // payment-form-style signing (passphrase appended at the end), this
+        // test fails immediately.
+        $client = new PayFastClient('10000100', 'test-key', 'jt7NOE43FZPn', sandbox: false);
+
+        $expectedAtEnd = md5(
+            'merchant-id=10000100&timestamp=2026-04-15T12:00:00%2B00:00&version=v1&passphrase=jt7NOE43FZPn'
+        );
+
+        $expectedAlphabetised = md5(
+            'merchant-id=10000100&passphrase=jt7NOE43FZPn&timestamp=2026-04-15T12%3A00%3A00%2B00%3A00&version=v1'
+        );
+
+        $actual = $client->generateApiSignature([
+            'merchant-id' => '10000100',
+            'timestamp'   => '2026-04-15T12:00:00+00:00',
+            'version'     => 'v1',
+        ]);
+
+        $this->assertNotSame($expectedAtEnd, $actual, 'Passphrase must NOT be appended at end of canonical form');
+        $this->assertSame($expectedAlphabetised, $actual);
+    }
+
+    public function test_exception_message_falls_back_to_data_response_when_message_is_false(): void
+    {
+        Http::fake([
+            'api.payfast.co.za/subscriptions/*/update*' => Http::response([
+                'code'   => 401,
+                'status' => 'failed',
+                'data'   => [
+                    'response' => 'Merchant authorization failed.',
+                    'message'  => false,
+                ],
+            ], 401),
+        ]);
+
+        try {
+            $this->makeClient()->updateSubscription('tok-xyz', ['amount' => 45000]);
+            $this->fail('Expected PayFastException was not thrown');
+        } catch (PayFastException $e) {
+            $this->assertStringContainsString('Merchant authorization failed.', $e->getMessage());
+            $this->assertStringNotContainsString("''", $e->getMessage());
+        }
+    }
 }
