@@ -10,6 +10,7 @@ use HandycatsDev\CashierPayFast\Events\PaymentComplete;
 use HandycatsDev\CashierPayFast\Events\PaymentFailed;
 use HandycatsDev\CashierPayFast\Events\SubscriptionCanceled;
 use HandycatsDev\CashierPayFast\Events\SubscriptionCreated;
+use HandycatsDev\CashierPayFast\Events\SubscriptionUpdated;
 use HandycatsDev\CashierPayFast\Events\WebhookHandled;
 use HandycatsDev\CashierPayFast\Events\WebhookReceived;
 use HandycatsDev\CashierPayFast\Http\Middleware\VerifyWebhookSignature;
@@ -134,11 +135,18 @@ class WebhookController extends Controller
 
             SubscriptionCreated::dispatch($billable, $subscription, $payload);
         } else {
+            // Subsequent recurring payment for an existing subscription.
+            // PayFast doesn't send a dedicated "subscription renewed" event;
+            // a COMPLETE ITN with a matching token IS the renewal signal.
+            // Dispatch SubscriptionUpdated so listeners can run renewal-time
+            // work (usage-period reset, pending-plan-change application, etc.)
             if ($subscription->status !== Subscription::STATUS_ACTIVE) {
                 $subscription->forceFill([
                     'status' => Subscription::STATUS_ACTIVE,
                 ])->save();
             }
+
+            SubscriptionUpdated::dispatch($subscription, $payload);
         }
     }
 
