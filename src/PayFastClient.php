@@ -2,6 +2,9 @@
 
 namespace HandycatsDev\CashierPayFast;
 
+use HandycatsDev\CashierPayFast\Events\ApiRequestFailed;
+use HandycatsDev\CashierPayFast\Events\ApiRequestSucceeded;
+use HandycatsDev\CashierPayFast\Exceptions\PayFastException;
 use Illuminate\Support\Facades\Http;
 
 class PayFastClient
@@ -147,36 +150,44 @@ class PayFastClient
         return $response->body() === 'VALID';
     }
 
-    public function cancelSubscription(string $token): bool
+    /**
+     * @return array<string, mixed>
+     *
+     * @throws PayFastException
+     */
+    public function cancelSubscription(string $token): array
     {
-        $response = Http::withHeaders($this->apiHeaders())
-            ->put($this->apiUrl()."/subscriptions/{$token}/cancel");
-
-        return $response->successful();
+        return $this->request('PUT', $this->apiUrl()."/subscriptions/{$token}/cancel");
     }
 
-    public function pauseSubscription(string $token): bool
+    /**
+     * @return array<string, mixed>
+     *
+     * @throws PayFastException
+     */
+    public function pauseSubscription(string $token): array
     {
-        $response = Http::withHeaders($this->apiHeaders())
-            ->put($this->apiUrl()."/subscriptions/{$token}/pause");
-
-        return $response->successful();
+        return $this->request('PUT', $this->apiUrl()."/subscriptions/{$token}/pause");
     }
 
-    public function unpauseSubscription(string $token): bool
+    /**
+     * @return array<string, mixed>
+     *
+     * @throws PayFastException
+     */
+    public function unpauseSubscription(string $token): array
     {
-        $response = Http::withHeaders($this->apiHeaders())
-            ->put($this->apiUrl()."/subscriptions/{$token}/unpause");
-
-        return $response->successful();
+        return $this->request('PUT', $this->apiUrl()."/subscriptions/{$token}/unpause");
     }
 
+    /**
+     * @return array<string, mixed>
+     *
+     * @throws PayFastException
+     */
     public function fetchSubscription(string $token): array
     {
-        $response = Http::withHeaders($this->apiHeaders())
-            ->get($this->apiUrl()."/subscriptions/{$token}/fetch");
-
-        return $response->json() ?? [];
+        return $this->request('GET', $this->apiUrl()."/subscriptions/{$token}/fetch");
     }
 
     public function processUrl(): string
@@ -194,6 +205,60 @@ class PayFastClient
         return $this->sandbox
             ? 'https://sandbox.payfast.co.za'
             : 'https://www.payfast.co.za';
+    }
+
+    /**
+     * Execute an authenticated PayFast API request.
+     *
+     * Dispatches ApiRequestSucceeded on success, ApiRequestFailed on failure,
+     * and throws PayFastException carrying the full PayFast error envelope.
+     *
+     * @return array<string, mixed>
+     *
+     * @throws PayFastException
+     */
+    private function request(string $method, string $url): array
+    {
+        $response = Http::withHeaders($this->apiHeaders())
+            ->{strtolower($method)}($url);
+
+        $body = $response->json() ?? [];
+        $statusIsFailed = isset($body['status']) && $body['status'] === 'failed';
+
+        if ($response->failed() || $statusIsFailed) {
+            $errorCode    = isset($body['code']) && is_scalar($body['code']) ? (string) $body['code'] : null;
+            $errorStatus  = $body['status'] ?? null;
+            $errorMessage = $body['data']['message'] ?? null;
+
+            ApiRequestFailed::dispatch(
+                method: $method,
+                url: $url,
+                statusCode: $response->status(),
+                errorCode: $errorCode,
+                errorStatus: $errorStatus,
+                errorMessage: $errorMessage,
+                responseBody: $body,
+            );
+
+            $exceptionMessage = sprintf(
+                "PayFast API error '%s' occurred on %s %s (HTTP %d)",
+                $errorMessage ?? 'unknown error',
+                $method,
+                $url,
+                $response->status(),
+            );
+
+            throw (new PayFastException($exceptionMessage))->setError($body);
+        }
+
+        ApiRequestSucceeded::dispatch(
+            method: $method,
+            url: $url,
+            statusCode: $response->status(),
+            responseBody: $body,
+        );
+
+        return $body;
     }
 
     protected function apiHeaders(): array
