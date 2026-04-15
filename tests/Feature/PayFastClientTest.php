@@ -21,7 +21,7 @@ class PayFastClientTest extends TestCase
     {
         Event::fake();
         Http::fake([
-            'api.payfast.co.za/subscriptions/*/cancel' => Http::response([
+            'api.payfast.co.za/subscriptions/*/cancel*' => Http::response([
                 'code'   => 200,
                 'status' => 'success',
                 'data'   => ['response' => true],
@@ -46,7 +46,7 @@ class PayFastClientTest extends TestCase
     {
         Event::fake();
         Http::fake([
-            'api.payfast.co.za/subscriptions/*/cancel' => Http::response([
+            'api.payfast.co.za/subscriptions/*/cancel*' => Http::response([
                 'code'   => 400,
                 'status' => 'failed',
                 'data'   => [
@@ -77,7 +77,7 @@ class PayFastClientTest extends TestCase
     {
         Event::fake();
         Http::fake([
-            'api.payfast.co.za/subscriptions/*/cancel' => Http::response([
+            'api.payfast.co.za/subscriptions/*/cancel*' => Http::response([
                 'code'   => 500,
                 'status' => 'failed',
                 'data'   => ['message' => 'Application Error'],
@@ -92,5 +92,68 @@ class PayFastClientTest extends TestCase
         }
 
         Event::assertDispatched(ApiRequestFailed::class, fn ($e) => $e->statusCode === 500);
+    }
+
+    public function test_cancel_subscription_appends_testing_query_param_in_sandbox_mode(): void
+    {
+        Http::fake([
+            '*' => Http::response(['code' => 200, 'status' => 'success', 'data' => ['response' => true]], 200),
+        ]);
+
+        $sandboxClient = new PayFastClient('10000100', 'test-key', 'test-passphrase', sandbox: true);
+
+        $sandboxClient->cancelSubscription('tok-abc');
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), '/subscriptions/tok-abc/cancel')
+                && str_contains($request->url(), 'testing=true');
+        });
+    }
+
+    public function test_cancel_subscription_does_not_append_testing_query_param_in_live_mode(): void
+    {
+        Http::fake([
+            '*' => Http::response(['code' => 200, 'status' => 'success', 'data' => ['response' => true]], 200),
+        ]);
+
+        $liveClient = new PayFastClient('10000100', 'test-key', 'test-passphrase', sandbox: false);
+
+        $liveClient->cancelSubscription('tok-abc');
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), '/subscriptions/tok-abc/cancel')
+                && ! str_contains($request->url(), 'testing=true');
+        });
+    }
+
+    public function test_exception_message_falls_back_to_raw_body_when_message_is_empty(): void
+    {
+        Http::fake([
+            'api.payfast.co.za/subscriptions/*/cancel*' => Http::response('Unauthorized', 401),
+        ]);
+
+        try {
+            $this->makeClient()->cancelSubscription('tok-xyz');
+            $this->fail('Expected PayFastException was not thrown');
+        } catch (PayFastException $e) {
+            $this->assertStringContainsString('Unauthorized', $e->getMessage());
+            $this->assertStringContainsString('HTTP 401', $e->getMessage());
+            $this->assertStringNotContainsString("''", $e->getMessage());
+        }
+    }
+
+    public function test_exception_message_reports_empty_body_when_response_has_no_body(): void
+    {
+        Http::fake([
+            'api.payfast.co.za/subscriptions/*/cancel*' => Http::response('', 401),
+        ]);
+
+        try {
+            $this->makeClient()->cancelSubscription('tok-xyz');
+            $this->fail('Expected PayFastException was not thrown');
+        } catch (PayFastException $e) {
+            $this->assertStringContainsString('empty response body', $e->getMessage());
+            $this->assertStringContainsString('HTTP 401', $e->getMessage());
+        }
     }
 }

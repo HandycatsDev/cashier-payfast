@@ -219,6 +219,14 @@ class PayFastClient
      */
     private function request(string $method, string $url): array
     {
+        // PayFast's subscription API uses a single host for live and sandbox,
+        // but sandbox calls must carry ?testing=true or they return HTTP 401
+        // "Merchant authorisation failed" because the sandbox merchant
+        // credentials do not match a live account.
+        if ($this->sandbox) {
+            $url .= (str_contains($url, '?') ? '&' : '?').'testing=true';
+        }
+
         $response = Http::withHeaders($this->apiHeaders())
             ->{strtolower($method)}($url);
 
@@ -240,9 +248,16 @@ class PayFastClient
                 responseBody: $body,
             );
 
+            // PayFast sometimes returns a non-JSON body (e.g. on 401) or a
+            // JSON body without data.message. Fall back to a truncated raw
+            // body so the exception message is never empty.
+            $messageForException = $errorMessage !== null && $errorMessage !== ''
+                ? $errorMessage
+                : $this->summariseResponseBody($response->body());
+
             $exceptionMessage = sprintf(
                 "PayFast API error '%s' occurred on %s %s (HTTP %d)",
-                $errorMessage ?? 'unknown error',
+                $messageForException,
                 $method,
                 $url,
                 $response->status(),
@@ -259,6 +274,26 @@ class PayFastClient
         );
 
         return $body;
+    }
+
+    /**
+     * Produce a safe single-line summary of a response body for use in an
+     * exception message. Returns a generic label if the body is empty.
+     */
+    private function summariseResponseBody(string $body): string
+    {
+        $trimmed = trim($body);
+
+        if ($trimmed === '') {
+            return 'empty response body';
+        }
+
+        $oneLine = preg_replace('/\s+/', ' ', $trimmed);
+        $max     = 200;
+
+        return mb_strlen($oneLine) > $max
+            ? mb_substr($oneLine, 0, $max).'…'
+            : $oneLine;
     }
 
     protected function apiHeaders(): array
