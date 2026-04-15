@@ -156,4 +156,56 @@ class PayFastClientTest extends TestCase
             $this->assertStringContainsString('HTTP 401', $e->getMessage());
         }
     }
+
+    public function test_update_subscription_patches_with_form_body_and_returns_response(): void
+    {
+        Http::fake([
+            'api.payfast.co.za/subscriptions/*/update*' => Http::response([
+                'code'   => 200,
+                'status' => 'success',
+                'data'   => ['response' => true],
+            ], 200),
+        ]);
+
+        $result = $this->makeClient()->updateSubscription('tok-abc', ['amount' => 1500]);
+
+        $this->assertEquals('success', $result['status']);
+
+        Http::assertSent(function ($request) {
+            return $request->method() === 'PATCH'
+                && str_contains($request->url(), '/subscriptions/tok-abc/update')
+                && $request['amount'] === 1500;
+        });
+    }
+
+    public function test_update_subscription_throws_on_payfast_error(): void
+    {
+        Http::fake([
+            'api.payfast.co.za/subscriptions/*/update*' => Http::response([
+                'code'   => 400,
+                'status' => 'failed',
+                'data'   => ['response' => false, 'message' => 'Invalid amount'],
+            ], 400),
+        ]);
+
+        try {
+            $this->makeClient()->updateSubscription('tok-abc', ['amount' => -1]);
+            $this->fail('Expected PayFastException was not thrown');
+        } catch (PayFastException $e) {
+            $this->assertStringContainsString('Invalid amount', $e->getMessage());
+            $this->assertEquals(400, $e->getError()['code']);
+        }
+    }
+
+    public function test_update_subscription_appends_testing_query_param_in_sandbox_mode(): void
+    {
+        Http::fake([
+            '*' => Http::response(['code' => 200, 'status' => 'success', 'data' => ['response' => true]], 200),
+        ]);
+
+        $sandbox = new PayFastClient('10000100', 'test-key', 'test-passphrase', sandbox: true);
+        $sandbox->updateSubscription('tok-abc', ['amount' => 1500]);
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'testing=true'));
+    }
 }

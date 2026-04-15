@@ -190,6 +190,26 @@ class PayFastClient
         return $this->request('GET', $this->apiUrl()."/subscriptions/{$token}/fetch");
     }
 
+    /**
+     * Update one or more attributes on an existing subscription.
+     *
+     * PayFast allows mid-cycle updates to `cycles`, `frequency`, `run_date`,
+     * and `amount` (in cents, ZAR). Any fields omitted are left unchanged.
+     *
+     * @param  array{cycles?: int, frequency?: int, run_date?: string, amount?: int}  $attributes
+     * @return array<string, mixed>
+     *
+     * @throws PayFastException
+     */
+    public function updateSubscription(string $token, array $attributes): array
+    {
+        return $this->request(
+            method: 'PATCH',
+            url: $this->apiUrl()."/subscriptions/{$token}/update",
+            body: $attributes,
+        );
+    }
+
     public function processUrl(): string
     {
         return $this->baseUrl().'/eng/process';
@@ -217,7 +237,13 @@ class PayFastClient
      *
      * @throws PayFastException
      */
-    private function request(string $method, string $url): array
+    /**
+     * @param  array<string, mixed>  $body
+     * @return array<string, mixed>
+     *
+     * @throws PayFastException
+     */
+    private function request(string $method, string $url, array $body = []): array
     {
         // PayFast's subscription API uses a single host for live and sandbox,
         // but sandbox calls must carry ?testing=true or they return HTTP 401
@@ -227,8 +253,13 @@ class PayFastClient
             $url .= (str_contains($url, '?') ? '&' : '?').'testing=true';
         }
 
-        $response = Http::withHeaders($this->apiHeaders())
-            ->{strtolower($method)}($url);
+        $http = Http::withHeaders($this->apiHeaders($body));
+
+        // PayFast expects form-encoded bodies for POST/PATCH operations on
+        // the subscription API (matching the payment form semantics).
+        $response = $body !== []
+            ? $http->asForm()->{strtolower($method)}($url, $body)
+            : $http->{strtolower($method)}($url);
 
         $body = $response->json() ?? [];
         $statusIsFailed = isset($body['status']) && $body['status'] === 'failed';
@@ -296,20 +327,36 @@ class PayFastClient
             : $oneLine;
     }
 
-    protected function apiHeaders(): array
+    /**
+     * Build request headers for the subscription API.
+     *
+     * PayFast requires the signature to be computed over the alphabetised
+     * union of header variables (merchant-id, version, timestamp) and any
+     * body variables, plus the passphrase. Endpoints with no body pass an
+     * empty array.
+     *
+     * @param  array<string, mixed>  $body
+     * @return array<string, string>
+     */
+    protected function apiHeaders(array $body = []): array
     {
         $timestamp = now()->toIso8601String();
 
+        $signaturePayload = [
+            'merchant-id' => $this->merchantId,
+            'passphrase'  => $this->passphrase,
+            'timestamp'   => $timestamp,
+            'version'     => 'v1',
+            ...$body,
+        ];
+
+        ksort($signaturePayload);
+
         return [
             'merchant-id' => $this->merchantId,
-            'version' => 'v1',
-            'timestamp' => $timestamp,
-            'signature' => $this->generateSignature([
-                'merchant-id' => $this->merchantId,
-                'passphrase' => $this->passphrase,
-                'timestamp' => $timestamp,
-                'version' => 'v1',
-            ]),
+            'version'     => 'v1',
+            'timestamp'   => $timestamp,
+            'signature'   => $this->generateSignature($signaturePayload),
         ];
     }
 }

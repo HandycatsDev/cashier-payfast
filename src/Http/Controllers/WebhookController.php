@@ -97,10 +97,18 @@ class WebhookController extends Controller
             return;
         }
 
-        $subscription->forceFill([
-            'status' => Subscription::STATUS_CANCELED,
-            'ends_at' => now(),
-        ])->save();
+        // Only set ends_at if it is not already configured. A caller that
+        // invoked $subscription->cancel($futureDate) has set a grace-period
+        // expiry that we must preserve — otherwise the webhook would
+        // silently terminate the grace period the moment PayFast
+        // acknowledges the cancel.
+        $attributes = ['status' => Subscription::STATUS_CANCELED];
+
+        if ($subscription->ends_at === null) {
+            $attributes['ends_at'] = now();
+        }
+
+        $subscription->forceFill($attributes)->save();
 
         SubscriptionCanceled::dispatch($subscription, $payload);
     }

@@ -3,6 +3,7 @@
 namespace HandycatsDev\CashierPayFast;
 
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use HandycatsDev\CashierPayFast\Concerns\Prorates;
 
@@ -232,14 +233,22 @@ class Subscription extends Model
         return $this;
     }
 
-    public function cancel(): static
+    /**
+     * Cancel the subscription with PayFast and mark it locally as cancelled.
+     *
+     * The $endsAt parameter lets the caller specify when the grace period
+     * ends — typically the end of the current billing period that the
+     * customer has already paid for. When null, defaults to now() (no grace
+     * period), which is the legacy behaviour.
+     */
+    public function cancel(?CarbonInterface $endsAt = null): static
     {
         $client = app(PayFastClient::class);
         $client->cancelSubscription($this->provider_id);
 
         $this->forceFill([
             'status' => self::STATUS_CANCELED,
-            'ends_at' => now(),
+            'ends_at' => $endsAt ?? now(),
         ])->save();
 
         return $this;
