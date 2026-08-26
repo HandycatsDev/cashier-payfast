@@ -9,7 +9,30 @@ use Illuminate\Support\Facades\Http;
 
 class PayFastClient
 {
-    protected const VALID_IP_RANGES = [
+    /**
+     * The hostnames PayFast sends ITNs from. Resolved at request time rather
+     * than pinned as IP ranges, which is what PayFast's own SDK does
+     * (lib/PaymentIntegrations/Notification.php::pfValidIP).
+     *
+     * This class previously carried two hardcoded ranges. PayFast serves ITNs
+     * from more addresses than that, and they change — a live notification
+     * from an address outside the pinned set is rejected as forged, silently,
+     * because the rejection is a 403 at the edge rather than an application
+     * error. Resolving the hostnames cannot go stale.
+     */
+    protected const VALID_ITN_HOSTS = [
+        'www.payfast.co.za',
+        'sandbox.payfast.co.za',
+        'w1w.payfast.co.za',
+        'w2w.payfast.co.za',
+    ];
+
+    /**
+     * Fallback for when DNS is unavailable. Deliberately a floor, not the
+     * answer: an ITN from an address outside it is still accepted if the
+     * hostnames resolve and list it.
+     */
+    protected const FALLBACK_IP_RANGES = [
         ['start' => '197.97.145.144', 'end' => '197.97.145.159'],
         ['start' => '41.74.179.192', 'end' => '41.74.179.223'],
     ];
@@ -117,12 +140,79 @@ class PayFastClient
         return md5($pfOutput);
     }
 
+    /**
+     * Validate the signature on an inbound ITN.
+     *
+     * NOT {@see generateSignature()}, which signs the OUTBOUND payment form
+     * and deliberately omits empty values. PayFast's own SDK
+     * (lib/PaymentIntegrations/Notification.php::dataToString) builds the ITN
+     * canonical form differently, and the difference is not cosmetic:
+     *
+     *  - every posted field is included, BLANKS AND ALL. An ITN is mostly
+     *    blanks, so signing it by the payment-form rule produces a completely
+     *    different MD5 and every genuine notification is rejected as forged;
+     *  - iteration STOPS at `signature` rather than skipping it, so fields
+     *    posted after it are excluded;
+     *  - values are not trimmed.
+     *
+     * The passphrase is the one genuinely ambiguous part. PayFast's SDK
+     * appends it raw (`&passphrase=$passPhrase`) while their documentation
+     * examples url-encode it, and their SDK's own test fixture uses an empty
+     * passphrase, so it settles nothing. Both forms are accepted rather than
+     * guessing: each is derived from the same secret, so tolerating the
+     * encoding costs no security, and picking the wrong one rejects every
+     * real notification.
+     *
+     * @param  array<string, mixed>  $data
+     */
     public function validateSignature(array $data): bool
     {
-        $receivedSignature = $data['signature'] ?? '';
-        $expectedSignature = $this->generateSignature($data);
+        $receivedSignature = (string) ($data['signature'] ?? '');
 
-        return hash_equals($expectedSignature, $receivedSignature);
+        if ($receivedSignature === '') {
+            return false;
+        }
+
+        foreach ($this->itnSignatureCandidates($data) as $candidate) {
+            if (hash_equals($candidate, $receivedSignature)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Every MD5 that could legitimately sign this ITN — one per passphrase
+     * encoding. See {@see validateSignature()} for why there is more than one.
+     *
+     * @param  array<string, mixed>  $data
+     * @return list<string>
+     */
+    private function itnSignatureCandidates(array $data): array
+    {
+        $canonical = '';
+
+        foreach ($data as $key => $val) {
+            // Stop AT the signature, do not merely skip it — PayFast signs
+            // only what precedes it in the posted order.
+            if ($key === 'signature') {
+                break;
+            }
+
+            $canonical .= $key.'='.urlencode((string) $val).'&';
+        }
+
+        $canonical = substr($canonical, 0, -1);
+
+        if ($this->passphrase === null || $this->passphrase === '') {
+            return [md5($canonical)];
+        }
+
+        return [
+            md5($canonical.'&passphrase='.$this->passphrase),
+            md5($canonical.'&passphrase='.urlencode($this->passphrase)),
+        ];
     }
 
     /**
@@ -155,20 +245,82 @@ class PayFastClient
         return md5(rtrim($canonical, '&'));
     }
 
+    /**
+     * Whether an ITN genuinely came from PayFast.
+     *
+     * Resolution is cached for five minutes: this runs on every notification,
+     * and a DNS lookup per webhook is both slow and a way to have PayFast's
+     * resolver rate-limit you into rejecting real traffic.
+     */
     public function isValidIp(string $ip): bool
     {
+        if (in_array($ip, $this->resolvedItnIps(), true)) {
+            return true;
+        }
+
         $ipLong = ip2long($ip);
 
-        foreach (self::VALID_IP_RANGES as $range) {
-            $startLong = ip2long($range['start']);
-            $endLong = ip2long($range['end']);
+        if ($ipLong === false) {
+            return false;
+        }
 
-            if ($ipLong >= $startLong && $ipLong <= $endLong) {
+        foreach (self::FALLBACK_IP_RANGES as $range) {
+            if ($ipLong >= ip2long($range['start']) && $ipLong <= ip2long($range['end'])) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /** @var list<string>|null */
+    protected static ?array $itnIpCache = null;
+
+    protected static ?int $itnIpCachedAt = null;
+
+    /**
+     * Resolved once per process for five minutes.
+     *
+     * A plain static rather than the Cache facade on purpose: this class is
+     * constructed directly in unit tests with no Laravel container, and
+     * reaching for a facade here made it un-instantiable outside one. The
+     * point of caching is only to avoid a DNS lookup on every notification,
+     * which a static achieves without adding a dependency.
+     *
+     * @return list<string>
+     */
+    protected function resolvedItnIps(): array
+    {
+        $now = time();
+
+        if (self::$itnIpCache !== null && self::$itnIpCachedAt !== null && ($now - self::$itnIpCachedAt) < 300) {
+            return self::$itnIpCache;
+        }
+
+        $ips = [];
+
+        foreach (self::VALID_ITN_HOSTS as $host) {
+            $resolved = gethostbynamel($host);
+
+            if (is_array($resolved)) {
+                $ips = array_merge($ips, $resolved);
+            }
+        }
+
+        self::$itnIpCache    = array_values(array_unique($ips));
+        self::$itnIpCachedAt = $now;
+
+        return self::$itnIpCache;
+    }
+
+    /**
+     * Drops the resolved-address cache. For tests, and for an operator who has
+     * to force a re-resolve without restarting the process.
+     */
+    public static function flushItnIpCache(): void
+    {
+        self::$itnIpCache    = null;
+        self::$itnIpCachedAt = null;
     }
 
     public function confirmItn(array $data): bool
